@@ -1,3 +1,21 @@
+/*
+ * (C) Copyright 2014 Nuxeo SA (http://nuxeo.com/) and others.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Contributors:
+ *     Thierry Delprat
+ */
 package org.nuxeo.directory.connector;
 
 import java.io.Serializable;
@@ -9,11 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 
-import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelList;
+import org.nuxeo.ecm.core.api.PropertyException;
 import org.nuxeo.ecm.core.api.impl.DocumentModelListImpl;
-import org.nuxeo.ecm.core.api.model.PropertyException;
+import org.nuxeo.ecm.core.api.model.PropertyNotFoundException;
+import org.nuxeo.ecm.core.query.sql.model.QueryBuilder;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.schema.types.Field;
 import org.nuxeo.ecm.core.schema.types.Schema;
@@ -27,46 +46,44 @@ import org.nuxeo.runtime.api.Framework;
  * Session for Directories based on a contributed connector
  *
  * @author tiry
- *
  */
-public class ConnectorBasedDirectorySession extends BaseSession implements
-        Session {
-
-    protected final ConnectorBasedDirectory directory;
+public class ConnectorBasedDirectorySession extends BaseSession implements Session {
 
     protected EntryConnector connector;
 
-    public ConnectorBasedDirectorySession(ConnectorBasedDirectory directory,
-            EntryConnector connector) {
-        this.directory = directory;
+    public ConnectorBasedDirectorySession(ConnectorBasedDirectory directory, EntryConnector connector) {
+        super(directory, Reference.class);
         this.connector = connector;
     }
 
-    public boolean authenticate(String username, String password)
-            throws DirectoryException {
+    @Override
+    public ConnectorBasedDirectory getDirectory() {
+        return (ConnectorBasedDirectory) directory;
+    }
+
+    public boolean authenticate(String username, String password) throws DirectoryException {
         return connector.authenticate(username, password);
     }
 
     public void close() {
-        if (connector!=null) {
+        if (connector != null) {
             connector.close();
         }
     }
 
     public void commit() {
-        if (connector!=null) {
+        if (connector != null) {
             connector.commit();
         }
     }
 
     public void rollback() throws DirectoryException {
-        if (connector!=null) {
+        if (connector != null) {
             connector.rollback();
         }
     }
 
-    public DocumentModel createEntry(Map<String, Object> fieldMap)
-            throws DirectoryException {
+    public DocumentModel createEntry(Map<String, Object> fieldMap) throws DirectoryException {
         throw new IllegalAccessError("Connector Directory is read only");
     }
 
@@ -78,7 +95,7 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
         Schema schema = Framework.getLocalService(SchemaManager.class).getSchema(directory.getSchema());
         Map<String, Object> newMap = new HashMap<>();
 
-        Map<String, String> mapping = directory.descriptor.getMapping();
+        Map<String, String> mapping = getDirectory().getDescriptor().getMapping();
         for (Field field : schema.getFields()) {
             String fieldId = field.getName().getLocalName();
             if (mapping.containsKey(fieldId)) {
@@ -90,8 +107,7 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
         return newMap;
     }
 
-    public DocumentModel getEntry(String id, boolean fetchReferences)
-            throws DirectoryException {
+    public DocumentModel getEntry(String id, boolean fetchReferences) throws DirectoryException {
         // XXX no references here
 
         Map<String, Object> map = connector.getEntryMap(id);
@@ -103,16 +119,14 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
         map = translate(map);
 
         try {
-            DocumentModel entry = BaseSession.createEntryModel(null,
-                    directory.schemaName, id, map);
+            DocumentModel entry = BaseSession.createEntryModel(null, directory.getSchema(), id, map);
 
             if (fetchReferences) {
                 for (Reference reference : directory.getReferences()) {
                     List<String> targetIds = reference.getTargetIdsForSource(entry.getId());
                     try {
-                        entry.setProperty(directory.schemaName,
-                                reference.getFieldName(), targetIds);
-                    } catch (ClientException e) {
+                        entry.setProperty(directory.getSchema(), reference.getFieldName(), targetIds);
+                    } catch (PropertyNotFoundException e) {
                         throw new DirectoryException(e);
                     }
                 }
@@ -141,8 +155,7 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
 
     // given our storage model this doesn't even make sense, as id field is
     // unique
-    public void deleteEntry(String id, Map<String, String> map)
-            throws DirectoryException {
+    public void deleteEntry(String id, Map<String, String> map) throws DirectoryException {
         throw new DirectoryException("Not implemented");
     }
 
@@ -150,47 +163,31 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
         deleteEntry(docModel.getId());
     }
 
-    public String getIdField() {
-        return directory.idField;
-    }
-
-    public String getPasswordField() {
-        return directory.passwordField;
-    }
-
-    public boolean isAuthenticating() {
-        return directory.passwordField != null;
-    }
-
     public boolean isReadOnly() {
         return true;
     }
 
-    public DocumentModelList query(Map<String, Serializable> filter)
-            throws DirectoryException {
+    public DocumentModelList query(Map<String, Serializable> filter) throws DirectoryException {
         return query(filter, connector.getFullTextConfig());
     }
 
-    public DocumentModelList query(Map<String, Serializable> filter,
-            Set<String> fulltext) throws DirectoryException {
+    public DocumentModelList query(Map<String, Serializable> filter, Set<String> fulltext) throws DirectoryException {
         return query(filter, fulltext, Collections.<String, String> emptyMap());
     }
 
-    public DocumentModelList query(Map<String, Serializable> filter,
-            Set<String> fulltext, Map<String, String> orderBy)
+    public DocumentModelList query(Map<String, Serializable> filter, Set<String> fulltext, Map<String, String> orderBy)
             throws DirectoryException {
         return query(filter, fulltext, orderBy, true);
     }
 
-    public DocumentModelList query(Map<String, Serializable> filter,
-            Set<String> fulltext, Map<String, String> orderBy,
+    public DocumentModelList query(Map<String, Serializable> filter, Set<String> fulltext, Map<String, String> orderBy,
             boolean fetchReferences) throws DirectoryException {
         DocumentModelList results = new DocumentModelListImpl();
         // canonicalize filter
         Map<String, Serializable> filt = new HashMap<String, Serializable>();
         for (Entry<String, Serializable> e : filter.entrySet()) {
             String fieldName = e.getKey();
-            if (!directory.schemaSet.contains(fieldName)) {
+            if (!getDirectory().schemaSet.contains(fieldName)) {
                 continue;
             }
             filt.put(fieldName, e.getValue());
@@ -205,26 +202,24 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
 
         // order entries
         if (orderBy != null && !orderBy.isEmpty()) {
-            directory.orderEntries(results, orderBy);
+            getDirectory().orderEntries(results, orderBy);
         }
         return results;
     }
 
-    public List<String> getProjection(Map<String, Serializable> filter,
-            String columnName) throws DirectoryException {
-        return getProjection(filter, Collections.<String> emptySet(),
-                columnName);
+    public List<String> getProjection(Map<String, Serializable> filter, String columnName) throws DirectoryException {
+        return getProjection(filter, Collections.<String> emptySet(), columnName);
     }
 
-    public List<String> getProjection(Map<String, Serializable> filter,
-            Set<String> fulltext, String columnName) throws DirectoryException {
+    public List<String> getProjection(Map<String, Serializable> filter, Set<String> fulltext, String columnName)
+            throws DirectoryException {
         DocumentModelList l = query(filter, fulltext);
         List<String> results = new ArrayList<String>(l.size());
         for (DocumentModel doc : l) {
             Object value;
             try {
-                value = doc.getProperty(directory.schemaName, columnName);
-            } catch (ClientException e) {
+                value = doc.getProperty(directory.getSchema(), columnName);
+            } catch (PropertyNotFoundException e) {
                 throw new DirectoryException(e);
             }
             if (value != null) {
@@ -236,14 +231,49 @@ public class ConnectorBasedDirectorySession extends BaseSession implements
         return results;
     }
 
-    public DocumentModel createEntry(DocumentModel entry)
-            throws ClientException {
-        Map<String, Object> fieldMap = entry.getProperties(directory.schemaName);
+    public DocumentModel createEntry(DocumentModel entry) {
+        Map<String, Object> fieldMap = entry.getProperties(directory.getSchema());
         return createEntry(fieldMap);
     }
 
-    public boolean hasEntry(String id) throws ClientException {
+    public boolean hasEntry(String id) {
         return connector.hasEntry(id);
     }
+
+	@Override
+	public DocumentModelList query(Map<String, Serializable> filter, Set<String> fulltext, Map<String, String> orderBy,
+			boolean fetchReferences, int limit, int offset) {
+		throw new UnsupportedOperationException("Not supported yet");
+	}
+
+	@Override
+	public DocumentModelList query(QueryBuilder queryBuilder, boolean fetchReferences) {
+		// TODO Auto-generated method stub
+		throw new UnsupportedOperationException("Not supported yet");
+	}
+
+	@Override
+	public List<String> queryIds(QueryBuilder queryBuilder) {
+		// TODO Auto-generated method stub
+		throw new UnsupportedOperationException("Not supported yet");
+	}
+
+	@Override
+	protected DocumentModel createEntryWithoutReferences(Map<String, Object> fieldMap) {
+		// TODO Auto-generated method stub
+		throw new UnsupportedOperationException("Not supported yet");
+	}
+
+	@Override
+	protected List<String> updateEntryWithoutReferences(DocumentModel docModel) {
+		// TODO Auto-generated method stub
+		throw new UnsupportedOperationException("Not supported yet");
+	}
+
+	@Override
+	protected void deleteEntryWithoutReferences(String id) {
+		// TODO Auto-generated method stub
+		throw new UnsupportedOperationException("Not supported yet");
+	}
 
 }

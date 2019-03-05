@@ -1,3 +1,21 @@
+/*
+ * (C) Copyright 2014 Nuxeo SA (http://nuxeo.com/) and others.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Contributors:
+ *     Thierry Delprat
+ */
 package org.nuxeo.directory.connector.test;
 
 import static org.junit.Assert.assertEquals;
@@ -11,37 +29,45 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelList;
+import org.nuxeo.ecm.core.test.CoreFeature;
+import org.nuxeo.ecm.core.test.DefaultRepositoryInit;
+import org.nuxeo.ecm.core.test.annotations.Granularity;
+import org.nuxeo.ecm.core.test.annotations.RepositoryConfig;
 import org.nuxeo.ecm.directory.Directory;
 import org.nuxeo.ecm.directory.Session;
 import org.nuxeo.ecm.directory.api.DirectoryService;
 import org.nuxeo.runtime.api.Framework;
-import org.nuxeo.runtime.test.NXRuntimeTestCase;
+import org.nuxeo.runtime.test.runner.Deploy;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
 
-public class TestConnectorDirectory extends NXRuntimeTestCase {
+import com.google.inject.Inject;
 
-    @Override
-    public void setUp() throws Exception {
-        super.setUp();
-        deployBundle("org.nuxeo.ecm.core.api");
-        deployBundle("org.nuxeo.ecm.core.schema");
-        deployBundle("org.nuxeo.ecm.core");
-        deployBundle("org.nuxeo.ecm.directory.api");
-        deployBundle("org.nuxeo.ecm.directory");
-        deployBundle("org.nuxeo.ecm.directory.types.contrib");
-        deployContrib("org.nuxeo.directory.connector",
-                "OSGI-INF/connectorbased-directory-framework.xml");
-    }
+@RunWith(FeaturesRunner.class)
+@Features({ CoreFeature.class })
+@RepositoryConfig(init = DefaultRepositoryInit.class, cleanup = Granularity.METHOD)
+@Deploy({
+        "org.nuxeo.ecm.core.api", 
+        "org.nuxeo.ecm.core.schema",
+        "org.nuxeo.ecm.core",
+        "org.nuxeo.ecm.directory.api",
+        "org.nuxeo.ecm.directory",
+        "org.nuxeo.ecm.directory.types.contrib",
+        "org.nuxeo.directory.connector:OSGI-INF/connectorbased-directory-framework.xml",
+        "org.nuxeo.directory.connector.test:OSGI-INF/testContrib.xml",
+        "org.nuxeo.directory.connector.test:OSGI-INF/testJsonDirectoryConnectorContrib.xml"
+})
+public class TestConnectorDirectory{
 
+	@Inject
+	DirectoryService ds;
     @Test
     public void testContrib() throws Exception {
-
-        deployContrib("org.nuxeo.directory.connector.test",
-                "OSGI-INF/testContrib.xml");
-
-        DirectoryService ds = Framework.getLocalService(DirectoryService.class);
         assertNotNull(ds);
 
         List<String> dsNames = ds.getDirectoryNames();
@@ -90,10 +116,6 @@ public class TestConnectorDirectory extends NXRuntimeTestCase {
 
     @Test
     public void testJsonDirectoryConnectorContrib() throws Exception {
-
-        deployContrib("org.nuxeo.directory.connector.test",
-                "OSGI-INF/testJsonDirectoryConnectorContrib.xml");
-        DirectoryService ds = Framework.getLocalService(DirectoryService.class);
         assertNotNull(ds);
 
         List<String> dsNames = ds.getDirectoryNames();
@@ -114,13 +136,11 @@ public class TestConnectorDirectory extends NXRuntimeTestCase {
 
     }
 
-
     @Test
+    @Ignore("API has changed: needs to update URLs and schema")
     public void testNasaDirectoryConnectorContrib() throws Exception {
 
-        deployContrib("org.nuxeo.directory.connector.test",
-                "OSGI-INF/testJsonDirectoryConnectorContrib.xml");
-        DirectoryService ds = Framework.getLocalService(DirectoryService.class);
+        DirectoryService ds = Framework.getService(DirectoryService.class);
         assertNotNull(ds);
 
         List<String> dsNames = ds.getDirectoryNames();
@@ -138,16 +158,11 @@ public class TestConnectorDirectory extends NXRuntimeTestCase {
         DocumentModel entry = session.getEntry("178");
         assertNotNull(entry);
         assertEquals("Aeronautics", (String) entry.getProperty("vocabulary", "label"));
-
     }
 
-
     @Test
+    @Ignore("API has changed: needs to update URLs and schema")
     public void testNasaDSDirectoryConnectorContrib() throws Exception {
-
-        deployContrib("org.nuxeo.directory.connector.test",
-                "OSGI-INF/testJsonDirectoryConnectorContrib.xml");
-        DirectoryService ds = Framework.getLocalService(DirectoryService.class);
         assertNotNull(ds);
 
         List<String> dsNames = ds.getDirectoryNames();
@@ -158,14 +173,12 @@ public class TestConnectorDirectory extends NXRuntimeTestCase {
         Session session = d.getSession();
         assertNotNull(session);
 
-
         Map<String, Serializable> filter = new HashMap<>();
         filter.put("category", "322");
 
         DocumentModelList entries = session.query(filter);
         assertNotNull(entries);
         assertEquals(10, entries.totalSize());
-
 
         DocumentModel entry = session.getEntry("707");
         assertNotNull(entry);

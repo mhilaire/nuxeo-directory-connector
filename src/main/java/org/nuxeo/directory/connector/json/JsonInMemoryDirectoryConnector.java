@@ -1,3 +1,21 @@
+/*
+ * (C) Copyright 2014 Nuxeo SA (http://nuxeo.com/) and others.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Contributors:
+ *     Thierry Delprat
+ */
 package org.nuxeo.directory.connector.json;
 
 import java.io.IOException;
@@ -16,10 +34,8 @@ import org.codehaus.jackson.type.TypeReference;
 import org.nuxeo.directory.connector.ConnectorBasedDirectoryDescriptor;
 import org.nuxeo.directory.connector.EntryConnector;
 import org.nuxeo.directory.connector.InMemorySearchHelper;
-import org.nuxeo.ecm.core.api.ClientException;
 
-public class JsonInMemoryDirectoryConnector extends BaseJSONDirectoryConnector
-        implements EntryConnector {
+public class JsonInMemoryDirectoryConnector extends BaseJSONDirectoryConnector implements EntryConnector {
 
     public ArrayList<HashMap<String, Object>> results;
 
@@ -78,7 +94,7 @@ public class JsonInMemoryDirectoryConnector extends BaseJSONDirectoryConnector
         return rc;
     }
 
-    public boolean hasEntry(String id) throws ClientException {
+    public boolean hasEntry(String id) {
         if (results != null) {
             for (int i = 0; i < results.size(); i++) {
                 if (results.get(i).get(idField).equals(id)) {
@@ -93,13 +109,12 @@ public class JsonInMemoryDirectoryConnector extends BaseJSONDirectoryConnector
     public void init(ConnectorBasedDirectoryDescriptor descriptor) {
         super.init(descriptor);
         results = this.getJsonStream();
-        idField = descriptor.getIdField();
+        idField = descriptor.idField;
 
     }
 
     @Override
-    public List<String> queryEntryIds(Map<String, Serializable> filter,
-            Set<String> fulltext) {
+    public List<String> queryEntryIds(Map<String, Serializable> filter, Set<String> fulltext) {
         return searchHelper.queryEntryIds(filter, fulltext);
     }
 

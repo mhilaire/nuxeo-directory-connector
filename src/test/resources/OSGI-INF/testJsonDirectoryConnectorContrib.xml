@@ -28,7 +28,7 @@
       <idField>id</idField>
       <schema>vocabulary</schema>
       <parameters>
-        <parameter name="url">http://data.nasa.gov/api/get_category_index/</parameter>
+        <parameter name="url">http://api.nasa.gov/get_category_index/</parameter>
       </parameters>
       <mapping>
        <map field="label">title</map>
@@ -43,7 +43,7 @@
       <idField>id</idField>
       <schema>nasads</schema>
       <parameters>
-        <parameter name="url">http://data.nasa.gov/api/</parameter>
+        <parameter name="url">http://api.nasa.gov/</parameter>
       </parameters>
       <mapping>
        <map field="id">id</map>

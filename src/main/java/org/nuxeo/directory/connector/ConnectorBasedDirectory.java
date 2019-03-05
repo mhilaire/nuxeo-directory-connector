@@ -1,15 +1,17 @@
 /*
- * (C) Copyright 2006-2007 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ * (C) Copyright 2006-2007 Nuxeo SA (http://nuxeo.com/) and others.
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  * Contributors:
  *     Florent Guillaume
@@ -24,12 +26,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.schema.types.Field;
 import org.nuxeo.ecm.core.schema.types.Schema;
 import org.nuxeo.ecm.directory.AbstractDirectory;
 import org.nuxeo.ecm.directory.DirectoryException;
+import org.nuxeo.ecm.directory.InverseReference;
 import org.nuxeo.ecm.directory.Session;
 import org.nuxeo.runtime.api.Framework;
 
@@ -38,76 +40,41 @@ import org.nuxeo.runtime.api.Framework;
  */
 public class ConnectorBasedDirectory extends AbstractDirectory {
 
-    public final String schemaName;
-
     public final Set<String> schemaSet;
-
-    public final String idField;
-
-    public final String passwordField;
 
     public Map<String, Object> map;
 
     public ConnectorBasedDirectorySession session;
 
-    protected ConnectorBasedDirectoryDescriptor descriptor;
-
-    public ConnectorBasedDirectory(ConnectorBasedDirectoryDescriptor descriptor)
-            throws DirectoryException {
-        super(descriptor.getName());
-        this.descriptor = descriptor;
-        this.schemaName = descriptor.getSchemaName();
+    public ConnectorBasedDirectory(ConnectorBasedDirectoryDescriptor descriptor) throws DirectoryException {
+        super(descriptor, InverseReference.class);
         this.schemaSet = new HashSet<String>();
-        this.idField = descriptor.getIdField();
-        this.passwordField = descriptor.getPasswordField();
-
         SchemaManager sm = Framework.getLocalService(SchemaManager.class);
-        Schema sch = sm.getSchema(descriptor.getSchemaName());
+        Schema sch = sm.getSchema(descriptor.schemaName);
         if (sch == null) {
-            throw new DirectoryException("Unknown schema : "
-                    + descriptor.getSchemaName());
+            throw new DirectoryException("Unknown schema : " + descriptor.schemaName);
         }
         Collection<Field> fields = sch.getFields();
         for (Field f : fields) {
             schemaSet.add(f.getName().getLocalName());
         }
-
-        try {
-            addReferences(descriptor.getInverseReferences());
-        } catch (ClientException e) {
-            log.error("Error during Connector based Directory initialization",
-                    e);
-        }
+        addReferences();
     }
 
-    public String getName() {
-        return name;
+    @Override
+    public ConnectorBasedDirectoryDescriptor getDescriptor() {
+        return (ConnectorBasedDirectoryDescriptor) descriptor;
     }
 
-    public String getSchema() {
-        return schemaName;
-    }
-
-    public String getParentDirectory() {
-        return null;
-    }
-
-    public String getIdField() {
-        return idField;
-    }
-
-    public String getPasswordField() {
-        return passwordField;
-    }
-
+    @Override
     public Session getSession() {
         if (session == null) {
-            session = new ConnectorBasedDirectorySession(this,
-                    descriptor.getConnector());
+            session = new ConnectorBasedDirectorySession(this, getDescriptor().getConnector());
         }
         return session;
     }
 
+    @Override
     public void shutdown() {
         if (session != null) {
             session.close();
